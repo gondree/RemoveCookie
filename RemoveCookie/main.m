@@ -5,6 +5,8 @@
 //  Created by Rob Mathers on 12-11-28.
 //  Copyright (c) 2012 Rob Mathers. All rights reserved.
 //
+//  Modified by Mark Gondree on 17-09-29
+//
 
 #import <Foundation/Foundation.h>
 
@@ -22,15 +24,8 @@ void IFPrint (NSString *format, ...) {
 int main(int argc, const char * argv[])
 {
     @autoreleasepool {
-        NSString *urlSearchString;
-        if (argc > 1) {
-            urlSearchString = [[NSString alloc] initWithUTF8String:argv[1]];
-        }
-        else {
-            IFPrint(@"No URL provided, quitting.");
-            return 1;
-        }
         NSHTTPCookieStorage *cookieStorage;
+        NSArray *matchedCookies;
         
         // Safari cookies in 10.11+ need to be accessed with sharedCookieStorageForGroupContainerIdentifier:
         // per http://stackoverflow.com/questions/32921572/stringwithcontentsofurl-cookie-jar-in-el-capitan
@@ -40,14 +35,23 @@ int main(int argc, const char * argv[])
         else {
             cookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
         }
-        
-        NSString *filterString = [[NSString alloc] initWithFormat:@"domain ENDSWITH '%@'", urlSearchString];
-        NSPredicate *filter = [NSPredicate predicateWithFormat:filterString];
-        
-        NSArray *matchedCookies = [cookieStorage.cookies filteredArrayUsingPredicate:filter];
+
+        NSString *urlSearchString;
+        if (argc > 1) {
+            urlSearchString = [[NSString alloc] initWithUTF8String:argv[1]];
+            NSString *filterString = [[NSString alloc] initWithFormat:@"domain ENDSWITH '%@'", urlSearchString];
+            NSPredicate *filter = [NSPredicate predicateWithFormat:filterString];
+            matchedCookies = [cookieStorage.cookies filteredArrayUsingPredicate:filter];
+        }
+        else {
+            IFPrint(@"No URL provided. Matching all cookies.");
+            matchedCookies = cookieStorage.cookies;
+        }
 
         for (int i = 0; i < matchedCookies.count; i++) {
-            [cookieStorage deleteCookie:[matchedCookies objectAtIndex:i]];
+            NSHTTPCookie *c = [matchedCookies objectAtIndex:i];
+            IFPrint(@"Removing %s [%s]", c.domain.UTF8String, c.name.UTF8String);
+            [cookieStorage deleteCookie:c];
         }
 
         IFPrint(@"Removed %li cookies", matchedCookies.count);
